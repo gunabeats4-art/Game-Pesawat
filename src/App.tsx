@@ -103,6 +103,7 @@ export default function App() {
       wingmanHp: 100,
       wingmanMaxHp: 100,
       wingmanTimer: 50,
+      activeContract: null,
     };
   });
 
@@ -110,10 +111,15 @@ export default function App() {
   const handleStatsUpdate = useCallback((newStats: GameStats) => {
     setStats(newStats);
     setMissions(newStats.activeMissions || missionManager.getMissions());
-    soundSystem.updateEngineSound(newStats.isBoosting, 0.5); // 0.5 as base speed
+    if (engineRef.current?.isRunning && !engineRef.current?.isPaused) {
+      soundSystem.updateEngineSound(newStats.isBoosting, 0.5);
+    } else {
+      soundSystem.stopEngineSound();
+    }
   }, []);
 
   const handleGameOver = useCallback((finalStats: GameStats) => {
+    soundSystem.stopEngineSound();
     setStats(finalStats);
     setGameState('GAME_OVER');
     setMissions(missionManager.getMissions());
@@ -131,6 +137,8 @@ export default function App() {
       shotsFired: finalStats.shotsFired,
       shotsHit: finalStats.shotsHit,
       isVictory: false,
+      activeContract: stats.activeContract,
+      contractFailed: engineRef.current?.contractFailed || false,
     });
 
     const sortieResult = pilotManager.recordSortie(finalStats, false);
@@ -170,6 +178,7 @@ export default function App() {
   }, [selectedPlane]);
 
   const handleVictory = useCallback((finalStats: GameStats) => {
+    soundSystem.stopEngineSound();
     setStats(finalStats);
     setGameState('VICTORY');
     setMissions(missionManager.getMissions());
@@ -187,6 +196,8 @@ export default function App() {
       shotsFired: finalStats.shotsFired,
       shotsHit: finalStats.shotsHit,
       isVictory: true,
+      activeContract: stats.activeContract,
+      contractFailed: engineRef.current?.contractFailed || false,
     });
 
     const sortieResult = pilotManager.recordSortie(finalStats, true);
@@ -237,13 +248,15 @@ export default function App() {
     setShowBriefingModal(false);
     if (engineRef.current) {
       engineRef.current.setPlane(selectedPlane);
+      engineRef.current.activeContract = stats.activeContract;
       engineRef.current.start();
     }
     setGameState('PLAYING');
     setMissions(missionManager.getMissions());
-  }, [selectedPlane]);
+  }, [selectedPlane, stats.activeContract]);
 
   const handlePause = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (gameState === 'PLAYING') {
       if (engineRef.current) {
         engineRef.current.pause();
@@ -263,6 +276,7 @@ export default function App() {
   }, [gameState]);
 
   const handleRestart = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (engineRef.current) {
       engineRef.current.setPlane(selectedPlane);
       engineRef.current.start();
@@ -272,6 +286,7 @@ export default function App() {
   }, [selectedPlane]);
 
   const handleReturnToTitle = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (engineRef.current) {
       engineRef.current.destroy();
     }
@@ -291,6 +306,7 @@ export default function App() {
   }, []);
 
   const handleOpenMissions = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (gameState === 'PLAYING') {
       if (engineRef.current) {
         engineRef.current.pause();
@@ -311,6 +327,7 @@ export default function App() {
   }, []);
 
   const handleOpenProfile = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (gameState === 'PLAYING') {
       if (engineRef.current) {
         engineRef.current.pause();
@@ -326,6 +343,7 @@ export default function App() {
   }, []);
 
   const handleOpenLeaderboard = useCallback(() => {
+    soundSystem.stopEngineSound();
     if (gameState === 'PLAYING') {
       if (engineRef.current) {
         engineRef.current.pause();
@@ -379,6 +397,26 @@ export default function App() {
     handleOpenProfile,
     handleOpenLeaderboard,
   ]);
+
+  // Audio safety: Ensure engine sound is strictly silenced when not playing or when window loses visibility
+  useEffect(() => {
+    if (gameState !== 'PLAYING') {
+      soundSystem.stopEngineSound();
+    }
+  }, [gameState]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        soundSystem.stopEngineSound();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      soundSystem.stopEngineSound();
+    };
+  }, []);
 
   const currentRank = getRankInfo(pilotProfile.careerXp).currentRank;
 
@@ -501,6 +539,8 @@ export default function App() {
           missions={missions}
           onClose={handleCloseMissions}
           onRefreshMissions={handleRefreshMissions}
+          onSelectContract={(contract) => setStats({ ...stats, activeContract: contract })}
+          activeContract={stats.activeContract}
         />
       )}
 

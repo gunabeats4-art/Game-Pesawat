@@ -3,6 +3,8 @@
  * Manages XP, Ranks, Lifetime Statistics, Streak Tracking, and persistence in localStorage under "pilotCareer".
  */
 
+import { SpecialContract } from './types';
+
 export interface CareerStats {
   missionsFlown: number;
   enemiesDefeated: number;
@@ -305,6 +307,8 @@ export class CareerManager {
     shotsFired: number;
     shotsHit: number;
     isVictory: boolean;
+    activeContract: SpecialContract | null;
+    contractFailed: boolean;
   }): {
     xpBreakdown: XpBreakdown;
     oldRank: CareerRank;
@@ -350,9 +354,14 @@ export class CareerManager {
       accuracyBonusXp +
       sectorXp +
       flawlessBonusXp;
+    
+    let contractBonusXp = 0;
+    if (sortieData.activeContract && !sortieData.contractFailed) {
+        contractBonusXp = sortieData.activeContract.bonusXp;
+    }
 
     const streakBonusXp = Math.round(baseXp * (streakMultiplier - 1));
-    const totalXp = baseXp + streakBonusXp;
+    const totalXp = baseXp + streakBonusXp + contractBonusXp;
 
     const oldRank = this.getRank(this.data.xp);
 

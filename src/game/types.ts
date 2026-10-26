@@ -163,11 +163,21 @@ export interface AsteroidHazard {
   vRot: number;
 }
 
+
+export interface SpecialContract {
+  id: string;
+  title: string;
+  description: string;
+  bonusXp: number;
+  type: 'no_bombs' | 'no_damage' | 'speed_run';
+}
+
 export interface GameStats {
   score: number;
   highScore: number;
   scoreMultiplier: number; // Combined combo and mission multiplier
   missionBonusMultiplier: number; // Active bonus from completed daily missions
+  activeContract: SpecialContract | null; // Added contract
   wave: number;
   sectorName: string;
   hp: number;
@@ -204,6 +214,7 @@ export interface GameStats {
   wingmanMaxHp: number;
   wingmanTimer: number;
 }
+
 
 
 

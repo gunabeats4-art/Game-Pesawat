@@ -1,4 +1,4 @@
-import { DailyMission, MissionObjectiveType, MissionRewardType } from './types';
+import { DailyMission, MissionObjectiveType, MissionRewardType, SpecialContract } from './types';
 
 const STORAGE_KEY = 'sky_raider_daily_missions_v1';
 
@@ -124,6 +124,23 @@ export function generateDailyMissions(dateStr: string): DailyMission[] {
 
   return selected;
 }
+
+export const SPECIAL_CONTRACTS: SpecialContract[] = [
+  {
+    id: 'c_no_bombs',
+    title: 'Tanpa Bom',
+    description: 'Selesaikan misi tanpa menggunakan Bom Taktis.',
+    bonusXp: 200,
+    type: 'no_bombs',
+  },
+  {
+    id: 'c_no_damage',
+    title: 'Sempurna',
+    description: 'Selesaikan misi tanpa menerima kerusakan apapun.',
+    bonusXp: 500,
+    type: 'no_damage',
+  },
+];
 
 export class MissionManager {
   private missions: DailyMission[] = [];

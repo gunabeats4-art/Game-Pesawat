@@ -5,6 +5,7 @@
 class SoundSystem {
   private ctx: AudioContext | null = null;
   public isMuted: boolean = false;
+  private lastChatterTime: number = 0;
 
   constructor() {
     // AudioContext will be initialized on user interaction to abide by browser autoplay policies
@@ -22,12 +23,11 @@ class SoundSystem {
     }
   }
 
-  public setMuted(muted: boolean) {
-    this.isMuted = muted;
-  }
-
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.stopEngineSound();
+    }
     return this.isMuted;
   }
 
@@ -332,48 +332,107 @@ class SoundSystem {
   }
 
   private engineOsc: OscillatorNode | null = null;
+  private engineSubOsc: OscillatorNode | null = null;
+  private engineFilter: BiquadFilterNode | null = null;
   private engineGain: GainNode | null = null;
 
-  public updateEngineSound(isBoosting: boolean, speed: number) {
+  public updateEngineSound(isBoosting: boolean, speed: number = 0.5) {
     if (this.isMuted) {
       this.stopEngineSound();
       return;
     }
-    
+
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx || this.ctx.state !== 'running') return;
 
-    if (!this.engineOsc) {
-      this.engineOsc = this.ctx.createOscillator();
-      this.engineGain = this.ctx.createGain();
-      this.engineOsc.type = 'sawtooth';
-      this.engineGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-      this.engineOsc.connect(this.engineGain);
-      this.engineGain.connect(this.ctx.destination);
-      this.engineOsc.start();
+    const t = this.ctx.currentTime;
+
+    if (!this.engineOsc || !this.engineGain) {
+      try {
+        const osc = this.ctx.createOscillator();
+        const subOsc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        // Warm turbine tone: smooth triangle wave instead of harsh buzzing sawtooth
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(65, t);
+
+        // Deep sub-harmonic rumble
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(36, t);
+
+        // Lowpass filter removes any harsh buzzing harmonics, keeping a realistic turbine rumble
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(220, t);
+        filter.Q.setValueAtTime(1.8, t);
+
+        // Very comfortable, gentle background volume
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.025, t + 0.1);
+
+        osc.connect(filter);
+        subOsc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(t);
+        subOsc.start(t);
+
+        this.engineOsc = osc;
+        this.engineSubOsc = subOsc;
+        this.engineFilter = filter;
+        this.engineGain = gain;
+      } catch {
+        return;
+      }
     }
 
-    // Dynamic pitch based on speed + boost
-    const baseFreq = 80 + (speed * 100);
-    const targetFreq = isBoosting ? baseFreq * 1.5 : baseFreq;
-    
-    if (this.engineOsc) {
-        this.engineOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
-    }
-    if (this.engineGain) {
-        this.engineGain.gain.setTargetAtTime(isBoosting ? 0.08 : 0.04, this.ctx.currentTime, 0.1);
+    // Dynamic pitch and filter cutoff based on flight speed + afterburner boost
+    const baseFreq = 60 + Math.min(Math.max(speed, 0), 1.5) * 35; // 60Hz - 95Hz
+    const targetFreq = isBoosting ? baseFreq * 1.4 : baseFreq;
+    const targetCutoff = isBoosting ? 380 : 220;
+    const targetVol = isBoosting ? 0.045 : 0.025;
+
+    if (this.engineOsc && this.engineSubOsc && this.engineFilter && this.engineGain) {
+      try {
+        this.engineOsc.frequency.setTargetAtTime(targetFreq, t, 0.12);
+        this.engineSubOsc.frequency.setTargetAtTime(targetFreq * 0.55, t, 0.12);
+        this.engineFilter.frequency.setTargetAtTime(targetCutoff, t, 0.15);
+        this.engineGain.gain.setTargetAtTime(targetVol, t, 0.12);
+      } catch {
+        // Safe parameter update ignore
+      }
     }
   }
 
   public stopEngineSound() {
-    if (this.engineOsc) {
-      this.engineOsc.stop();
-      this.engineOsc = null;
+    const osc = this.engineOsc;
+    const sub = this.engineSubOsc;
+    const filter = this.engineFilter;
+    const gain = this.engineGain;
+
+    this.engineOsc = null;
+    this.engineSubOsc = null;
+    this.engineFilter = null;
+    this.engineGain = null;
+
+    if (gain && this.ctx && this.ctx.state === 'running') {
+      try {
+        const t = this.ctx.currentTime;
+        gain.gain.setValueAtTime(gain.gain.value, t);
+        gain.gain.linearRampToValueAtTime(0.0001, t + 0.04);
+      } catch {
+        // Safe ramp ignore
+      }
     }
-    if (this.engineGain) {
-      this.engineGain.disconnect();
-      this.engineGain = null;
-    }
+
+    setTimeout(() => {
+      try { osc?.stop(); osc?.disconnect(); } catch {}
+      try { sub?.stop(); sub?.disconnect(); } catch {}
+      try { filter?.disconnect(); } catch {}
+      try { gain?.disconnect(); } catch {}
+    }, 50);
   }
 
   public setMuted(muted: boolean) {

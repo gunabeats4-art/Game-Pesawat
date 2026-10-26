@@ -1,7 +1,7 @@
 import { soundSystem } from './audio';
 import { missionManager } from './missions';
 import { drawFighterJet, drawWingman, PLANE_CONFIGS } from './planes';
-import { Bullet, CombatLogEntry, DailyMission, Enemy, FloatingText, GameStats, Missile, Particle, PlaneId, Powerup, PowerupType, WeatherEventType, AsteroidHazard } from './types';
+import { Bullet, CombatLogEntry, DailyMission, Enemy, FloatingText, GameStats, Missile, Particle, PlaneId, Powerup, PowerupType, WeatherEventType, AsteroidHazard, SpecialContract } from './types';
 import { pilotManager } from './pilot';
 import { combatReplayBuffer } from './replay';
 import { upgradeManager } from './upgrades';
@@ -83,6 +83,8 @@ export class SkyRaiderEngine {
   private bonusShieldCapacity: number = 0;
   private combatLogs: CombatLogEntry[] = [];
   private difficultyMultiplier: number = 1.0;
+  public contractFailed: boolean = false;
+  public activeContract: SpecialContract | null = null;
 
   // Game Feel (Camera Shake & Hitstop)
   private trauma: number = 0;
@@ -278,6 +280,7 @@ export class SkyRaiderEngine {
 
   public pause() {
     this.isPaused = true;
+    soundSystem.stopEngineSound();
   }
 
   public resume() {
@@ -289,6 +292,7 @@ export class SkyRaiderEngine {
 
   public destroy() {
     this.isRunning = false;
+    soundSystem.stopEngineSound();
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
       this.animFrameId = null;
@@ -379,6 +383,13 @@ export class SkyRaiderEngine {
 
   public triggerBomb() {
     if (this.playerBombs <= 0 || this.bombEffectTimer > 0) return;
+
+    // Contract Failure
+    const currentStats = this.getCurrentStats();
+    if (currentStats.activeContract?.type === 'no_bombs') {
+        this.addCombatLog('SPECIAL CONTRACT FAILED: Bomb used!', 'warning');
+        this.contractFailed = true;
+    }
 
     this.playerBombs--;
     this.bombsUsed++;
@@ -1386,6 +1397,13 @@ export class SkyRaiderEngine {
     this.trauma = Math.min(1.0, this.trauma + 0.35);
     this.addCombatLog(`Warning: Armor sustaining enemy fire!`, 'warning');
 
+    // Contract Failure
+    const currentStats = this.getCurrentStats();
+    if (currentStats.activeContract?.type === 'no_damage') {
+        this.addCombatLog('SPECIAL CONTRACT FAILED: Damage sustained!', 'warning');
+        this.contractFailed = true;
+    }
+
     if (this.playerShield > 0) {
       this.playerShield -= amount;
       if (this.playerShield < 0) {
@@ -1413,6 +1431,7 @@ export class SkyRaiderEngine {
 
   private onPlayerDeath() {
     this.isRunning = false;
+    soundSystem.stopEngineSound();
     combatReplayBuffer.stopRecording();
     soundSystem.playExplosion('boss');
     this.createExplosion(this.playerX, this.playerY, 'boss', '#ef4444');
@@ -1566,6 +1585,7 @@ export class SkyRaiderEngine {
       wingmanHp: this.wingmanHp,
       wingmanMaxHp: this.wingmanMaxHp,
       wingmanTimer: this.wingmanActive ? this.wingmanTimer : this.wingmanCooldown,
+      activeContract: this.activeContract,
     };
   }
 
