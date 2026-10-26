@@ -110,6 +110,7 @@ export default function App() {
   const handleStatsUpdate = useCallback((newStats: GameStats) => {
     setStats(newStats);
     setMissions(newStats.activeMissions || missionManager.getMissions());
+    soundSystem.updateEngineSound(newStats.isBoosting, 0.5); // 0.5 as base speed
   }, []);
 
   const handleGameOver = useCallback((finalStats: GameStats) => {

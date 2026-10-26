@@ -331,7 +331,55 @@ class SoundSystem {
     });
   }
 
-  private lastChatterTime: number = 0;
+  private engineOsc: OscillatorNode | null = null;
+  private engineGain: GainNode | null = null;
+
+  public updateEngineSound(isBoosting: boolean, speed: number) {
+    if (this.isMuted) {
+      this.stopEngineSound();
+      return;
+    }
+    
+    this.initCtx();
+    if (!this.ctx) return;
+
+    if (!this.engineOsc) {
+      this.engineOsc = this.ctx.createOscillator();
+      this.engineGain = this.ctx.createGain();
+      this.engineOsc.type = 'sawtooth';
+      this.engineGain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      this.engineOsc.connect(this.engineGain);
+      this.engineGain.connect(this.ctx.destination);
+      this.engineOsc.start();
+    }
+
+    // Dynamic pitch based on speed + boost
+    const baseFreq = 80 + (speed * 100);
+    const targetFreq = isBoosting ? baseFreq * 1.5 : baseFreq;
+    
+    if (this.engineOsc) {
+        this.engineOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.1);
+    }
+    if (this.engineGain) {
+        this.engineGain.gain.setTargetAtTime(isBoosting ? 0.08 : 0.04, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  public stopEngineSound() {
+    if (this.engineOsc) {
+      this.engineOsc.stop();
+      this.engineOsc = null;
+    }
+    if (this.engineGain) {
+      this.engineGain.disconnect();
+      this.engineGain = null;
+    }
+  }
+
+  public setMuted(muted: boolean) {
+    this.isMuted = muted;
+    if (muted) this.stopEngineSound();
+  }
 
   public playRadioBeep() {
     if (this.isMuted) return;
