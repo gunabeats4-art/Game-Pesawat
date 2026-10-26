@@ -1,0 +1,6 @@
+{
+  "name": "Sky Raider: Elang Tempur",
+  "description": "An exhilarating arcade aerial combat shoot-'em-up featuring intense dogfights, customizable fighter jets, epic boss battles, and 60fps arcade action.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
