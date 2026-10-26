@@ -12,6 +12,9 @@ import { GameOverModal } from './components/GameOverModal';
 import { DailyMissionsModal } from './components/DailyMissionsModal';
 import { PilotProfileModal } from './components/PilotProfileModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
+import { ReplayModal } from './components/ReplayModal';
+import { HangarManagerModal } from './components/HangarManagerModal';
+import { TacticalBriefingModal } from './components/TacticalBriefingModal';
 import { StoredAchievementData, AchievementStatus } from './game/achievements';
 import { DailyMission, GameState, GameStats, PlaneId } from './game/types';
 import { SkyRaiderEngine } from './game/engine';
@@ -20,6 +23,8 @@ import { PLANE_CONFIGS } from './game/planes';
 import { missionManager, getTodayDateString } from './game/missions';
 import { pilotManager, PilotProfile, getRankInfo } from './game/pilot';
 import { leaderboardManager } from './game/leaderboard';
+import { careerManager, XpBreakdown } from './game/career';
+import { upgradeManager } from './game/upgrades';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('TITLE');
@@ -28,14 +33,20 @@ export default function App() {
   const [showMissionsModal, setShowMissionsModal] = useState<boolean>(false);
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
+  const [showReplayModal, setShowReplayModal] = useState<boolean>(false);
+  const [showHangarModal, setShowHangarModal] = useState<boolean>(false);
+  const [showBriefingModal, setShowBriefingModal] = useState<boolean>(false);
   const [lastLeaderboardRank, setLastLeaderboardRank] = useState<number | null>(null);
   const [missions, setMissions] = useState<DailyMission[]>(() => missionManager.getMissions());
   const [pilotProfile, setPilotProfile] = useState<PilotProfile>(() => pilotManager.getProfile());
   const [lastSortieResult, setLastSortieResult] = useState<{
     xpGained: number;
     didRankUp: boolean;
+    oldRankTitle: string;
     newRankTitle: string;
     unlockedAchievements: AchievementStatus[];
+    xpBreakdown?: XpBreakdown;
+    isNewRecord?: boolean;
   } | null>(null);
 
   const engineRef = useRef<SkyRaiderEngine | null>(null);
@@ -83,6 +94,15 @@ export default function App() {
       bossMaxHp: null,
       bossName: null,
       activeMissions: currentMissions,
+      combatLogs: [],
+      aceRating: pilotManager.getAceRating().rating,
+      aceTitle: pilotManager.getAceRating().title,
+      activeWeather: 'clear',
+      weatherTimer: 0,
+      wingmanActive: true,
+      wingmanHp: 100,
+      wingmanMaxHp: 100,
+      wingmanTimer: 50,
     };
   });
 
@@ -97,13 +117,35 @@ export default function App() {
     setGameState('GAME_OVER');
     setMissions(missionManager.getMissions());
 
-    // Record sortie in pilot career log
+    const regularKills = finalStats.regularEnemiesKilled ?? Math.max(0, finalStats.enemiesKilled - finalStats.bossesDefeated);
+    const eliteKills = finalStats.eliteEnemiesKilled ?? 0;
+
+    const careerRes = careerManager.recordMission({
+      score: finalStats.score,
+      wave: finalStats.wave,
+      regularKills,
+      eliteKills,
+      flagshipsSunk: finalStats.bossesDefeated,
+      bombsUsed: finalStats.bombsUsed || 0,
+      shotsFired: finalStats.shotsFired,
+      shotsHit: finalStats.shotsHit,
+      isVictory: false,
+    });
+
     const sortieResult = pilotManager.recordSortie(finalStats, false);
+
+    if (careerRes.didRankUp) {
+      soundSystem.playPilotChatter('promotion');
+    }
+
     setLastSortieResult({
-      xpGained: sortieResult.xpGained,
-      didRankUp: sortieResult.didRankUp,
-      newRankTitle: sortieResult.newRank.title,
+      xpGained: careerRes.xpBreakdown.totalXp,
+      didRankUp: careerRes.didRankUp,
+      oldRankTitle: careerRes.oldRank.title,
+      newRankTitle: careerRes.newRank.title,
       unlockedAchievements: sortieResult.unlockedAchievements || [],
+      xpBreakdown: careerRes.xpBreakdown,
+      isNewRecord: careerRes.isNewRecord,
     });
     setPilotProfile(pilotManager.getProfile());
 
@@ -131,13 +173,35 @@ export default function App() {
     setGameState('VICTORY');
     setMissions(missionManager.getMissions());
 
-    // Record victorious sortie in pilot career log
+    const regularKills = finalStats.regularEnemiesKilled ?? Math.max(0, finalStats.enemiesKilled - finalStats.bossesDefeated);
+    const eliteKills = finalStats.eliteEnemiesKilled ?? 0;
+
+    const careerRes = careerManager.recordMission({
+      score: finalStats.score,
+      wave: finalStats.wave,
+      regularKills,
+      eliteKills,
+      flagshipsSunk: finalStats.bossesDefeated,
+      bombsUsed: finalStats.bombsUsed || 0,
+      shotsFired: finalStats.shotsFired,
+      shotsHit: finalStats.shotsHit,
+      isVictory: true,
+    });
+
     const sortieResult = pilotManager.recordSortie(finalStats, true);
+
+    if (careerRes.didRankUp) {
+      soundSystem.playPilotChatter('promotion');
+    }
+
     setLastSortieResult({
-      xpGained: sortieResult.xpGained,
-      didRankUp: sortieResult.didRankUp,
-      newRankTitle: sortieResult.newRank.title,
+      xpGained: careerRes.xpBreakdown.totalXp,
+      didRankUp: careerRes.didRankUp,
+      oldRankTitle: careerRes.oldRank.title,
+      newRankTitle: careerRes.newRank.title,
       unlockedAchievements: sortieResult.unlockedAchievements || [],
+      xpBreakdown: careerRes.xpBreakdown,
+      isNewRecord: careerRes.isNewRecord,
     });
     setPilotProfile(pilotManager.getProfile());
 
@@ -165,6 +229,11 @@ export default function App() {
   }, []);
 
   const handleStartGame = useCallback(() => {
+    setShowBriefingModal(true);
+  }, []);
+
+  const handleDeployFromBriefing = useCallback(() => {
+    setShowBriefingModal(false);
     if (engineRef.current) {
       engineRef.current.setPlane(selectedPlane);
       engineRef.current.start();
@@ -343,6 +412,7 @@ export default function App() {
           pilotProfile={pilotProfile}
           onOpenProfile={handleOpenProfile}
           onOpenLeaderboard={handleOpenLeaderboard}
+          onOpenHangar={() => setShowHangarModal(true)}
         />
       )}
 
@@ -382,12 +452,46 @@ export default function App() {
           onOpenMissions={handleOpenMissions}
           xpEarned={lastSortieResult?.xpGained || 0}
           didRankUp={Boolean(lastSortieResult?.didRankUp)}
+          oldRankTitle={lastSortieResult?.oldRankTitle || ''}
           newRankTitle={lastSortieResult?.newRankTitle || ''}
+          xpBreakdown={lastSortieResult?.xpBreakdown}
           onOpenProfile={handleOpenProfile}
           leaderboardRank={lastLeaderboardRank}
           onOpenLeaderboard={handleOpenLeaderboard}
           unlockedAchievements={lastSortieResult?.unlockedAchievements || []}
+          onOpenReplay={() => setShowReplayModal(true)}
         />
+      )}
+
+      {/* Tactical Hangar & Upgrades Modal */}
+      {showHangarModal && (
+        <HangarManagerModal
+          onClose={() => setShowHangarModal(false)}
+          selectedPlaneId={selectedPlane}
+          onSelectPlane={(planeId) => setSelectedPlane(planeId)}
+          onUpgradesUpdated={() => {
+            setPilotProfile(pilotManager.getProfile());
+          }}
+        />
+      )}
+
+      {/* Pre-Sortie Tactical Briefing Modal */}
+      {showBriefingModal && (
+        <TacticalBriefingModal
+          stats={stats}
+          selectedPlaneId={selectedPlane}
+          onDeploy={handleDeployFromBriefing}
+          onClose={() => setShowBriefingModal(false)}
+          onOpenHangar={() => {
+            setShowBriefingModal(false);
+            setShowHangarModal(true);
+          }}
+        />
+      )}
+
+      {/* Combat Replay Highlight Reel Modal */}
+      {showReplayModal && (
+        <ReplayModal onClose={() => setShowReplayModal(false)} />
       )}
 
       {/* Daily Directives Modal */}

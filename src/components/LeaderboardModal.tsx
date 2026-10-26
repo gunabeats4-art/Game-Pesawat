@@ -62,14 +62,14 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
         <div className="flex items-center gap-2.5 mb-1">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
           <span className="font-mono text-xs uppercase tracking-widest text-amber-400 font-semibold">
-            CENTRAL COMMAND · GLOBAL ACE RANKINGS
+            KOMANDO PUSAT · PERINGKAT PILOT HANDAL
           </span>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-wider flex items-center gap-2.5">
             <Trophy className="w-6 h-6 text-amber-400" />
-            TOP 10 SQUADRON RECORD
+            10 REKOR SKUADRON TERBAIK
           </h2>
 
           {/* Interactive Aircraft Filter Tabs */}
@@ -82,7 +82,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              ALL
+              SEMUA
             </button>
             <button
               onClick={() => setFilter('garuda')}
@@ -121,7 +121,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
         <div className="flex-1 overflow-y-auto pr-1 mb-6 border border-slate-800/80 rounded-xl bg-slate-950/60 divide-y divide-slate-800/60">
           {entries.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs font-mono">
-              NO SORTIE RECORDS FOUND FOR THIS SQUADRON FILTER
+              TIDAK ADA REKOR PERTEMPURAN UNTUK KATEGORI INI
             </div>
           ) : (
             entries.map((entry, idx) => {
@@ -166,7 +166,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                         </span>
                         {isCurrentPlayer && (
                           <span className="text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded">
-                            YOU
+                            ANDA
                           </span>
                         )}
                       </div>
@@ -175,9 +175,9 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                       <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 mt-0.5">
                         <span style={{ color: plane.primaryColor }}>{plane.name}</span>
                         <span aria-hidden="true" className="text-slate-600">·</span>
-                        <span>Sector {entry.wave}</span>
+                        <span>Sektor {entry.wave}</span>
                         <span aria-hidden="true" className="text-slate-600">·</span>
-                        <span>{entry.accuracy}% ACC</span>
+                        <span>{entry.accuracy}% AKURASI</span>
                       </div>
                     </div>
                   </div>
@@ -185,7 +185,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
                   {/* Right: Score and Date */}
                   <div className="text-right shrink-0 pl-3">
                     <div className="text-base sm:text-xl font-bold font-mono tabular-nums text-white tracking-wider">
-                      {entry.score.toLocaleString()}
+                      {entry.score.toLocaleString('id-ID')}
                     </div>
                     <div className="text-[10px] font-mono text-slate-500">
                       {entry.date}
@@ -204,18 +204,18 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
               leaderboardManager.resetToDefaults();
               setFilter('all');
             }}
-            title="Reset community high scores to defaults"
+            title="Reset rekor skor ke default"
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl text-xs font-mono text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>RESET TO DEFAULTS</span>
+            <span>RESET KE DEFAULT</span>
           </button>
 
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer text-sm"
           >
-            CLOSE RANKINGS
+            TUTUP PERINGKAT
           </button>
         </div>
       </div>

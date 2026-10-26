@@ -40,21 +40,21 @@ export const PauseModal: React.FC<PauseModalProps> = ({
           <Play className="w-6 h-6 fill-current" />
         </div>
 
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-wider mb-0.5">TACTICAL PAUSE</h2>
-        <p className="text-xs text-slate-400 mb-4 font-mono">MISSION TIME SUSPENDED</p>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-wider mb-0.5">JEDA TAKTIS</h2>
+        <p className="text-xs text-slate-400 mb-4 font-mono">WAKTU MISI DIHENTIKAN SEMENTARA</p>
 
         {/* Daily Directives Quick View */}
         {activeMissions && activeMissions.length > 0 && (
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 mb-5 text-left">
             <div className="flex items-center justify-between text-xs font-mono text-amber-400 mb-2">
               <span className="flex items-center gap-1 font-semibold uppercase">
-                <Target className="w-3.5 h-3.5" /> DAILY DIRECTIVES
+                <Target className="w-3.5 h-3.5" /> MISI HARIAN
               </span>
               <button
                 onClick={onOpenMissions}
                 className="text-cyan-400 hover:text-cyan-300 underline text-[11px] cursor-pointer"
               >
-                VIEW DETAILS
+                LIHAT DETAIL
               </button>
             </div>
             <div className="space-y-1.5">
@@ -83,7 +83,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer flex items-center justify-center gap-2"
           >
             <Play className="w-4 h-4 fill-current" />
-            RESUME SORTIE [ESC]
+            LANJUTKAN MISI [ESC]
           </button>
 
           <button
@@ -91,7 +91,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 text-slate-200 font-semibold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <RotateCcw className="w-4 h-4" />
-            RESTART MISSION
+            ULANGI MISI
           </button>
 
           {onOpenLeaderboard && (
@@ -100,7 +100,7 @@ export const PauseModal: React.FC<PauseModalProps> = ({
               className="w-full py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-amber-500/40 text-amber-300 font-semibold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-mono"
             >
               <Trophy className="w-3.5 h-3.5" />
-              GLOBAL LEADERBOARD
+              PAPAN PERINGKAT GLOBAL
             </button>
           )}
 
@@ -109,18 +109,18 @@ export const PauseModal: React.FC<PauseModalProps> = ({
             className="w-full py-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 font-medium rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <Home className="w-4 h-4" />
-            RETURN TO HANGAR
+            KEMBALI KE HANGAR
           </button>
         </div>
 
         <div className="flex items-center justify-between pt-4 border-t border-slate-800 text-xs text-slate-400">
-          <span>AUDIO TOGGLE</span>
+          <span>SUARA / AUDIO</span>
           <button
             onClick={onToggleMute}
             className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 rounded-lg hover:text-white transition-colors cursor-pointer"
           >
             {isMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{isMuted ? 'MUTED' : 'ACTIVE'}</span>
+            <span>{isMuted ? 'DIBISUKAN' : 'AKTIF'}</span>
           </button>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
 import { GameStats } from '../game/types';
 import { AchievementStatus } from '../game/achievements';
-import { RotateCcw, Home, Award, Target, Crosshair, Zap, Trophy, Crown, CheckCircle2 } from 'lucide-react';
+import { combatReplayBuffer } from '../game/replay';
+import { XpBreakdown } from '../game/career';
+import { RotateCcw, Home, Award, Target, Crosshair, Zap, Trophy, Crown, CheckCircle2, Film, Flame } from 'lucide-react';
 
 interface GameOverModalProps {
   isVictory: boolean;
@@ -11,11 +13,14 @@ interface GameOverModalProps {
   onOpenMissions?: () => void;
   xpEarned?: number;
   didRankUp?: boolean;
+  oldRankTitle?: string;
   newRankTitle?: string;
+  xpBreakdown?: XpBreakdown;
   onOpenProfile?: () => void;
   leaderboardRank?: number | null;
   onOpenLeaderboard?: () => void;
   unlockedAchievements?: AchievementStatus[];
+  onOpenReplay?: () => void;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
@@ -26,11 +31,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onOpenMissions,
   xpEarned = 0,
   didRankUp = false,
+  oldRankTitle = '',
   newRankTitle = '',
+  xpBreakdown,
   onOpenProfile,
   leaderboardRank = null,
   onOpenLeaderboard,
   unlockedAchievements = [],
+  onOpenReplay,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,9 +57,24 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/90 select-none font-display">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-slate-100">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-slate-100 max-h-[92vh] overflow-y-auto">
+        {/* Promotion Banner */}
+        {didRankUp && (
+          <div className="bg-gradient-to-r from-amber-500/20 via-purple-500/20 to-cyan-500/20 border-2 border-amber-400 p-3.5 rounded-xl mb-4 text-center animate-pulse shadow-[0_0_25px_rgba(245,158,11,0.35)]">
+            <div className="flex items-center justify-center gap-2 text-amber-300 font-mono text-sm font-bold tracking-widest uppercase">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <span>KENAIKAN PANGKAT!</span>
+              <Crown className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="text-xs text-slate-200 mt-1 font-mono">
+              NAIK PANGKAT DARI <span className="text-slate-400 font-semibold">{oldRankTitle || 'Kadet'}</span> KE{' '}
+              <span className="text-cyan-300 font-bold uppercase">{newRankTitle}</span>!
+            </div>
+          </div>
+        )}
+
         {/* Status Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <div
             className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center mb-3 border ${
               isVictory
@@ -63,33 +86,33 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-bold tracking-wider mb-1">
-            {isVictory ? 'MISSION ACCOMPLISHED' : 'AIRCRAFT DOWNED'}
+            {isVictory ? 'MISI SELESAI' : 'PESAWAT JATUH'}
           </h2>
           <p className="text-xs font-mono tracking-widest text-slate-400 uppercase">
-            {isVictory ? 'ALL HOSTILE FORCES ELIMINATED' : 'TACTICAL RETREAT · SORTIE TERMINATED'}
+            {isVictory ? 'SELURUH PASUKAN MUSUH DIMUSNAHKAN' : 'RETREAT TAKTIS · MISI BERAKHIR'}
           </p>
         </div>
 
         {/* Score & Record Display */}
         <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center mb-5">
-          <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">FINAL SCORE</div>
+          <div className="text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">SKOR AKHIR</div>
           <div className="text-3xl sm:text-4xl font-bold font-mono tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-200">
-            {stats.score.toLocaleString()}
+            {stats.score.toLocaleString('id-ID')}
           </div>
 
           {stats.missionBonusMultiplier > 0 && (
             <div className="text-xs font-mono text-amber-400 mt-1">
-              INCLUDES +{Math.round(stats.missionBonusMultiplier * 100)}% DAILY MISSION BONUS MULTIPLIER
+              TERMASUK BONUS MISI HARIAN +{Math.round(stats.missionBonusMultiplier * 100)}%
             </div>
           )}
 
           {isNewHighScore ? (
             <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-xs font-semibold">
-              <Award className="w-3.5 h-3.5" /> NEW SQUADRON RECORD!
+              <Award className="w-3.5 h-3.5" /> REKOR SKUADRON BARU!
             </div>
           ) : (
             <div className="text-xs font-mono text-slate-400 mt-1">
-              BEST: <span className="tabular-nums text-slate-300">{stats.highScore.toLocaleString()}</span>
+              REKOR TERBAIK: <span className="tabular-nums text-slate-300">{stats.highScore.toLocaleString('id-ID')}</span>
             </div>
           )}
         </div>
@@ -97,36 +120,92 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         {/* Detailed Debrief Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5 text-center">
           <div className="bg-slate-950/60 border border-slate-800/80 p-2.5 rounded-xl">
-            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">SECTOR</div>
+            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">SEKTOR</div>
             <div className="text-lg font-bold font-mono text-cyan-400 tabular-nums">{stats.wave}</div>
           </div>
 
           <div className="bg-slate-950/60 border border-slate-800/80 p-2.5 rounded-xl">
-            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">KILLS</div>
+            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">TERTEMBAK</div>
             <div className="text-lg font-bold font-mono text-rose-400 tabular-nums">{stats.enemiesKilled}</div>
           </div>
 
           <div className="bg-slate-950/60 border border-slate-800/80 p-2.5 rounded-xl">
-            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">MAX COMBO</div>
+            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">KOMBO MAKS</div>
             <div className="text-lg font-bold font-mono text-amber-400 tabular-nums">x{stats.maxCombo}</div>
           </div>
 
           <div className="bg-slate-950/60 border border-slate-800/80 p-2.5 rounded-xl">
-            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">ACCURACY</div>
+            <div className="text-[10px] font-mono text-slate-400 uppercase mb-0.5">AKURASI</div>
             <div className="text-lg font-bold font-mono text-emerald-400 tabular-nums">{accuracy}%</div>
           </div>
         </div>
+
+        {/* Itemized XP Breakdown Box */}
+        {xpBreakdown && (
+          <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 mb-5 text-left">
+            <div className="text-[10px] font-mono uppercase text-cyan-400 font-bold flex items-center justify-between mb-2 border-b border-slate-800 pb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5" /> RINCIAN XP MISI
+              </span>
+              <span className="text-amber-400 tabular-nums">+{xpBreakdown.totalXp} XP</span>
+            </div>
+
+            <div className="space-y-1 text-xs font-mono text-slate-300">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Musuh Biasa ({xpBreakdown.regularKillsCount} × 10)</span>
+                <span className="tabular-nums text-white">+{xpBreakdown.regularKillsXp} XP</span>
+              </div>
+              {xpBreakdown.eliteKillsCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Pesawat Elite ({xpBreakdown.eliteKillsCount} × 25)</span>
+                  <span className="tabular-nums text-white">+{xpBreakdown.eliteKillsXp} XP</span>
+                </div>
+              )}
+              {xpBreakdown.flagshipsCount > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Kapal Induk Musuh ({xpBreakdown.flagshipsCount} × 150)</span>
+                  <span className="tabular-nums text-amber-400 font-bold">+{xpBreakdown.flagshipXp} XP</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Pembersihan Sektor (Sektor {xpBreakdown.highestSector} × 100)</span>
+                <span className="tabular-nums text-cyan-300">+{xpBreakdown.sectorXp} XP</span>
+              </div>
+              {xpBreakdown.accuracyBonusXp > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Bonus Akurasi ({xpBreakdown.accuracyPercent}%)</span>
+                  <span className="tabular-nums text-emerald-400">+{xpBreakdown.accuracyBonusXp} XP</span>
+                </div>
+              )}
+              {xpBreakdown.flawlessBonusXp > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Bonus Misi Tanpa Kerusakan</span>
+                  <span className="tabular-nums text-amber-300">+{xpBreakdown.flawlessBonusXp} XP</span>
+                </div>
+              )}
+              {xpBreakdown.streakBonusXp > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-800/80 pt-1 mt-1 text-amber-300 font-bold">
+                  <span className="flex items-center gap-1 text-amber-400">
+                    <Flame className="w-3.5 h-3.5 fill-amber-500/40 animate-pulse shrink-0" />
+                    Rentetan Misi ({xpBreakdown.streakDays} Hari) (+{Math.round((xpBreakdown.streakMultiplier - 1) * 100)}% Bonus)
+                  </span>
+                  <span className="tabular-nums">+{xpBreakdown.streakBonusXp} XP</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Daily Directives Summary Badge */}
         {stats.activeMissions && stats.activeMissions.length > 0 && (
           <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 mb-5 flex items-center justify-between text-left">
             <div>
               <div className="text-[10px] font-mono uppercase text-amber-400 font-semibold flex items-center gap-1.5">
-                <Target className="w-3.5 h-3.5" /> DAILY DIRECTIVES PROGRESS
+                <Target className="w-3.5 h-3.5" /> PROGRES MISI HARIAN
               </div>
               <div className="text-xs text-slate-300 mt-0.5">
-                <span className="font-bold text-white tabular-nums">{completedMissions.length}</span> of{' '}
-                <span className="tabular-nums">{stats.activeMissions.length}</span> Directives Complete
+                <span className="font-bold text-white tabular-nums">{completedMissions.length}</span> dari{' '}
+                <span className="tabular-nums">{stats.activeMissions.length}</span> Misi Selesai
               </div>
             </div>
 
@@ -135,7 +214,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 onClick={onOpenMissions}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-cyan-300 hover:text-white transition-colors cursor-pointer"
               >
-                DIRECTIVES
+                MISI HARIAN
               </button>
             )}
           </div>
@@ -145,14 +224,14 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-3 mb-5 flex items-center justify-between text-left">
           <div>
             <div className="text-[10px] font-mono uppercase text-cyan-400 font-semibold flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5" /> PILOT CAREER PROGRESSION
+              <Zap className="w-3.5 h-3.5" /> PROGRESI KARIR PILOT
             </div>
             <div className="text-xs text-slate-300 mt-0.5">
-              <span className="font-bold text-white tabular-nums">+{xpEarned.toLocaleString()} XP</span> Earned This Sortie
+              <span className="font-bold text-white tabular-nums">+{xpEarned.toLocaleString('id-ID')} XP</span> Diperoleh Misi Ini
             </div>
             {didRankUp && (
               <div className="text-xs font-bold text-amber-400 mt-1 flex items-center gap-1 animate-pulse">
-                <span>★ PROMOTION EARNED:</span>
+                <span>★ KENAIKAN PANGKAT:</span>
                 <span>{newRankTitle}!</span>
               </div>
             )}
@@ -173,9 +252,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <div className="bg-amber-950/30 border border-amber-500/50 rounded-xl p-3 mb-5 text-left shadow-[0_0_15px_rgba(245,158,11,0.15)]">
             <div className="text-[10px] font-mono uppercase text-amber-400 font-bold flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Crown className="w-3.5 h-3.5" /> COMBAT BADGE UNLOCKED!
+                <Crown className="w-3.5 h-3.5" /> LENCANA TEMPUR TERBUKA!
               </span>
-              <span className="text-[9px] text-amber-300/80">INSPECT IN DOSSIER</span>
+              <span className="text-[9px] text-amber-300/80">LIHAT DI BERKAS KARIR</span>
             </div>
             <div className="mt-1.5 space-y-1">
               {unlockedAchievements.map((ach) => (
@@ -199,17 +278,27 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold flex items-center justify-between shadow-[0_0_12px_rgba(245,158,11,0.2)]">
               <span className="flex items-center gap-1.5">
                 <Trophy className="w-4 h-4 text-amber-400" />
-                GLOBAL TOP 10 REACHED: RANK #{leaderboardRank}!
+                MASUK 10 BESAR GLOBAL: PERINGKAT #{leaderboardRank}!
               </span>
               {onOpenLeaderboard && (
                 <button
                   onClick={onOpenLeaderboard}
                   className="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 cursor-pointer"
                 >
-                  VIEW
+                  LIHAT
                 </button>
               )}
             </div>
+          )}
+
+          {combatReplayBuffer.hasReplayData() && onOpenReplay && (
+            <button
+              onClick={onOpenReplay}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-750 border border-cyan-500/40 text-cyan-300 font-bold rounded-xl transition-all shadow-[0_0_12px_rgba(56,189,248,0.2)] cursor-pointer flex items-center justify-center gap-2 text-xs font-mono"
+            >
+              <Film className="w-4 h-4 text-cyan-400" />
+              PUTAR SIARAN ULANG [REPLAY TEMPUR]
+            </button>
           )}
 
           <button
@@ -217,7 +306,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(14,165,233,0.35)] cursor-pointer flex items-center justify-center gap-2"
           >
             <RotateCcw className="w-4 h-4" />
-            PLAY AGAIN [SPACE / ENTER]
+            MAIN LAGI [SPASI / ENTER]
           </button>
 
           <div className="grid grid-cols-2 gap-2">
@@ -227,7 +316,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 className="py-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-600 text-amber-300 font-semibold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-mono"
               >
                 <Trophy className="w-3.5 h-3.5" />
-                LEADERBOARD
+                PERINGKAT
               </button>
             )}
 

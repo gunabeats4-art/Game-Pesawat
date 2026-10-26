@@ -142,11 +142,25 @@ export interface DailyMission {
   rewardIcon: string;
 }
 
-export interface ActiveBuff {
+export interface CombatLogEntry {
   id: string;
-  name: string;
-  description: string;
-  scoreMultiplierBonus: number; // e.g. 0.5 for +50%
+  timestamp: number;
+  text: string;
+  type: 'kill' | 'warning' | 'powerup' | 'achievement' | 'boss';
+}
+
+export type WeatherEventType = 'clear' | 'thunderstorm' | 'asteroid_field';
+
+export interface AsteroidHazard {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  hp: number;
+  maxHp: number;
+  rotation: number;
+  vRot: number;
 }
 
 export interface GameStats {
@@ -166,6 +180,8 @@ export interface GameStats {
   boostGauge: number;
   isBoosting: boolean;
   enemiesKilled: number;
+  regularEnemiesKilled?: number;
+  eliteEnemiesKilled?: number;
   bossesDefeated: number;
   shotsFired: number;
   shotsHit: number;
@@ -178,5 +194,16 @@ export interface GameStats {
   bossMaxHp: number | null;
   bossName: string | null;
   activeMissions: DailyMission[];
+  combatLogs: CombatLogEntry[];
+  aceRating: number;
+  aceTitle: string;
+  activeWeather: WeatherEventType;
+  weatherTimer: number;
+  wingmanActive: boolean;
+  wingmanHp: number;
+  wingmanMaxHp: number;
+  wingmanTimer: number;
 }
+
+
 

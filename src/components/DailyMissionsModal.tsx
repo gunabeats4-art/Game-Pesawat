@@ -47,15 +47,15 @@ export const DailyMissionsModal: React.FC<DailyMissionsModalProps> = ({
         <div className="flex items-center gap-2.5 mb-1">
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
           <span className="font-mono text-xs uppercase tracking-widest text-amber-400 font-semibold">
-            HQ TACTICAL DIRECTIVES · ROTATING DAILY
+            MISI TAKTIS MARKAS BESAR · DIPERBARUI HARIAN
           </span>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-wider">DAILY COMBAT MISSIONS</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-wider">MISI TEMPUR HARIAN</h2>
           <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400">
             <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-            <span>DATE: {todayStr}</span>
+            <span>TANGGAL: {todayStr}</span>
           </div>
         </div>
 
@@ -63,25 +63,25 @@ export const DailyMissionsModal: React.FC<DailyMissionsModalProps> = ({
         <div className="bg-gradient-to-r from-amber-500/15 via-slate-950/70 to-cyan-500/15 border border-amber-500/30 rounded-xl p-3.5 mb-5 flex items-center justify-between">
           <div>
             <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-              ACTIVE COMBAT MULTIPLIER
+              PENGALI BONUS TEMPUR AKTIF
             </div>
             <div className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <span className="text-amber-400 font-mono tabular-nums">
-                +{Math.round(totalScoreBonus * 100)}% SCORE BONUS
+                +{Math.round(totalScoreBonus * 100)}% BONUS SKOR
               </span>
               <span className="text-xs text-slate-400 font-normal">
-                ({completedCount}/{missions.length} Directives Cleared)
+                ({completedCount}/{missions.length} Misi Selesai)
               </span>
             </div>
           </div>
 
           <button
             onClick={onRefreshMissions}
-            title="Reroll daily operations for new tactical challenges"
+            title="Acak ulang operasional harian untuk tantangan taktis baru"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             <RotateCw className="w-3 h-3 text-cyan-400" />
-            <span>REROLL</span>
+            <span>ACAK ULANG</span>
           </button>
         </div>
 
@@ -107,7 +107,7 @@ export const DailyMissionsModal: React.FC<DailyMissionsModalProps> = ({
                       </span>
                       {mission.completed && (
                         <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-semibold bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">
-                          <CheckCircle2 className="w-3 h-3" /> COMPLETED
+                          <CheckCircle2 className="w-3 h-3" /> SELESAI
                         </span>
                       )}
                     </div>
@@ -127,7 +127,7 @@ export const DailyMissionsModal: React.FC<DailyMissionsModalProps> = ({
                 {/* Progress Bar */}
                 <div className="mt-2.5">
                   <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mb-1">
-                    <span>PROGRESS</span>
+                    <span>PROGRES</span>
                     <span className="tabular-nums text-slate-300 font-semibold">
                       {mission.progress} / {mission.target} ({pct}%)
                     </span>
@@ -151,7 +151,7 @@ export const DailyMissionsModal: React.FC<DailyMissionsModalProps> = ({
           onClick={onClose}
           className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer"
         >
-          CONFIRM DIRECTIVES & RETURN
+          KONFIRMASI MISI & KEMBALI
         </button>
       </div>
     </div>

@@ -1,7 +1,11 @@
 import { soundSystem } from './audio';
 import { missionManager } from './missions';
-import { drawFighterJet, PLANE_CONFIGS } from './planes';
-import { Bullet, DailyMission, Enemy, FloatingText, GameStats, Missile, Particle, PlaneId, Powerup, PowerupType } from './types';
+import { drawFighterJet, drawWingman, PLANE_CONFIGS } from './planes';
+import { Bullet, CombatLogEntry, DailyMission, Enemy, FloatingText, GameStats, Missile, Particle, PlaneId, Powerup, PowerupType, WeatherEventType, AsteroidHazard } from './types';
+import { pilotManager } from './pilot';
+import { combatReplayBuffer } from './replay';
+import { upgradeManager } from './upgrades';
+
 
 export interface EngineCallbacks {
   onStatsUpdate: (stats: GameStats) => void;
@@ -66,6 +70,8 @@ export class SkyRaiderEngine {
   private score: number = 0;
   private highScore: number = 0;
   private enemiesKilled: number = 0;
+  private regularEnemiesKilled: number = 0;
+  private eliteEnemiesKilled: number = 0;
   private bossesDefeated: number = 0;
   private shotsFired: number = 0;
   private shotsHit: number = 0;
@@ -75,12 +81,66 @@ export class SkyRaiderEngine {
   private bombsUsed: number = 0;
   private powerupsCollected: number = 0;
   private bonusShieldCapacity: number = 0;
+  private combatLogs: CombatLogEntry[] = [];
+  private difficultyMultiplier: number = 1.0;
 
   // Game Feel (Camera Shake & Hitstop)
   private trauma: number = 0;
   private hitstopTimer: number = 0;
   private bombEffectTimer: number = 0;
   private bombShockwaveRadius: number = 0;
+
+  private addCombatLog(text: string, type: CombatLogEntry['type']) {
+    this.combatLogs.unshift({
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: Date.now(),
+      text,
+      type,
+    });
+    if (this.combatLogs.length > 20) {
+      this.combatLogs.pop();
+    }
+  }
+
+  private activeWeather: WeatherEventType = 'clear';
+  private weatherTimer: number = 0;
+  private weatherSpawnTimer: number = 30.0;
+  private lightningFlashTimer: number = 0;
+  private asteroids: AsteroidHazard[] = [];
+  private wingmanActive: boolean = true;
+  private wingmanX: number = 0;
+  private wingmanY: number = 0;
+  private wingmanHp: number = 100;
+  private wingmanMaxHp: number = 100;
+  private wingmanTimer: number = 50.0;
+  private wingmanCooldown: number = 0;
+  private wingmanShootTimer: number = 0;
+
+  private triggerWeather(type: WeatherEventType) {
+    this.activeWeather = type;
+    this.weatherTimer = 35.0;
+    if (type === 'thunderstorm') {
+      this.addCombatLog('ENVIRONMENTAL HAZARD: Severe Thunderstorm active!', 'warning');
+    } else if (type === 'asteroid_field') {
+      this.addCombatLog('HAZARD WARNING: Asteroid Field trajectory intersecting sector!', 'warning');
+    }
+  }
+
+  private spawnAsteroid() {
+    const w = this.canvas.width;
+    const radius = 22 + Math.random() * 28;
+    this.asteroids.push({
+      x: Math.random() * w,
+      y: -60,
+      vx: (Math.random() - 0.5) * 40,
+      vy: 110 + Math.random() * 80,
+      radius,
+      hp: Math.round(radius * 1.5),
+      maxHp: Math.round(radius * 1.5),
+      rotation: Math.random() * Math.PI * 2,
+      vRot: (Math.random() - 0.5) * 3,
+    });
+  }
 
   constructor(canvas: HTMLCanvasElement, callbacks: EngineCallbacks) {
     this.canvas = canvas;
@@ -138,22 +198,24 @@ export class SkyRaiderEngine {
   public setPlane(id: PlaneId) {
     this.planeId = id;
     const cfg = PLANE_CONFIGS[id];
+    const upg = upgradeManager.getCalculatedBonuses();
     this.bonusShieldCapacity = missionManager.getShieldOverchargeBonus();
-    this.playerHp = cfg.maxHp;
-    this.playerShield = cfg.maxShield + this.bonusShieldCapacity;
-    this.playerBombs = cfg.maxBombs + missionManager.getExtraBombBonus();
-    this.weaponLevel = 1 + missionManager.getWeaponLevelBonus();
+    this.playerHp = cfg.maxHp + upg.hpBonus;
+    this.playerShield = cfg.maxShield + this.bonusShieldCapacity + upg.shieldBonus;
+    this.playerBombs = cfg.maxBombs + missionManager.getExtraBombBonus() + upg.extraBombBonus;
+    this.weaponLevel = 1 + missionManager.getWeaponLevelBonus() + upg.baseWeaponLevelBonus;
   }
 
   public start() {
     const cfg = PLANE_CONFIGS[this.planeId];
+    const upg = upgradeManager.getCalculatedBonuses();
     this.bonusShieldCapacity = missionManager.getShieldOverchargeBonus();
     this.playerX = this.canvas.width / 2;
     this.playerY = this.canvas.height * 0.8;
-    this.playerHp = cfg.maxHp;
-    this.playerShield = cfg.maxShield + this.bonusShieldCapacity;
-    this.playerBombs = cfg.maxBombs + missionManager.getExtraBombBonus();
-    this.weaponLevel = 1 + missionManager.getWeaponLevelBonus();
+    this.playerHp = cfg.maxHp + upg.hpBonus;
+    this.playerShield = cfg.maxShield + this.bonusShieldCapacity + upg.shieldBonus;
+    this.playerBombs = cfg.maxBombs + missionManager.getExtraBombBonus() + upg.extraBombBonus;
+    this.weaponLevel = 1 + missionManager.getWeaponLevelBonus() + upg.baseWeaponLevelBonus;
     this.boostGauge = 100;
     this.invulnerableTimer = 2.0;
 
@@ -164,6 +226,17 @@ export class SkyRaiderEngine {
     this.particles = [];
     this.powerups = [];
     this.floatingTexts = [];
+    this.asteroids = [];
+    this.activeWeather = 'clear';
+    this.weatherTimer = 0;
+    this.weatherSpawnTimer = 30.0;
+    this.wingmanActive = true;
+    this.wingmanHp = 100;
+    this.wingmanMaxHp = 100;
+    this.wingmanTimer = 50.0;
+    this.wingmanCooldown = 0;
+    this.wingmanX = this.playerX - 55;
+    this.wingmanY = this.playerY + 22;
 
     this.wave = 1;
     this.waveTimer = 0;
@@ -174,6 +247,8 @@ export class SkyRaiderEngine {
 
     this.score = 0;
     this.enemiesKilled = 0;
+    this.regularEnemiesKilled = 0;
+    this.eliteEnemiesKilled = 0;
     this.bossesDefeated = 0;
     this.shotsFired = 0;
     this.shotsHit = 0;
@@ -189,6 +264,13 @@ export class SkyRaiderEngine {
     this.isRunning = true;
     this.isPaused = false;
     this.lastTime = performance.now();
+    combatReplayBuffer.startRecording();
+
+    const aceInfo = pilotManager.getAceRating();
+    this.difficultyMultiplier = 1.0 + (aceInfo.rating / 100) * 0.40;
+    this.combatLogs = [];
+    this.addCombatLog(`Sortie launched. Callsign active. Ace Rating: ${aceInfo.rating} (${aceInfo.title}).`, 'warning');
+    this.addCombatLog('WINGMAN SUPPORT: Falcon-2 escort fighter deployed.', 'powerup');
 
     this.emitStats();
     this.loop(this.lastTime);
@@ -305,6 +387,7 @@ export class SkyRaiderEngine {
     this.trauma = Math.min(1.0, this.trauma + 0.8);
 
     soundSystem.playBomb();
+    soundSystem.playPilotChatter('bomb_authorized');
 
     // Damage all enemies on screen and wipe bullets
     this.bullets = this.bullets.filter(b => b.isPlayer);
@@ -378,6 +461,50 @@ export class SkyRaiderEngine {
       this.trauma = Math.max(0, this.trauma - dt * 1.8);
     }
 
+    // Weather & Environmental Events Management
+    if (this.activeWeather !== 'clear') {
+      this.weatherTimer -= dt;
+      if (this.weatherTimer <= 0) {
+        this.activeWeather = 'clear';
+        this.addCombatLog('Environmental hazard cleared. Weather returning to normal.', 'warning');
+      } else {
+        if (this.activeWeather === 'thunderstorm') {
+          this.lightningFlashTimer -= dt;
+          if (this.lightningFlashTimer <= 0) {
+            this.lightningFlashTimer = 5.0 + Math.random() * 6.0;
+            this.trauma = Math.min(1.0, this.trauma + 0.6);
+            soundSystem.playExplosion('small');
+            this.addCombatLog('LIGHTNING STRIKE! Electrostatic surge across shields.', 'warning');
+            this.damagePlayer(12);
+          }
+          this.playerX += Math.sin(performance.now() * 0.003) * 55 * dt;
+        } else if (this.activeWeather === 'asteroid_field') {
+          if (Math.random() < dt * 1.2) {
+            this.spawnAsteroid();
+          }
+        }
+      }
+    } else {
+      this.weatherSpawnTimer -= dt;
+      if (this.weatherSpawnTimer <= 0) {
+        this.weatherSpawnTimer = 45.0;
+        const roll = Math.random();
+        this.triggerWeather(roll < 0.5 ? 'thunderstorm' : 'asteroid_field');
+      }
+    }
+
+    // Update Asteroids
+    for (let i = this.asteroids.length - 1; i >= 0; i--) {
+      const ast = this.asteroids[i];
+      ast.x += ast.vx * dt;
+      ast.y += ast.vy * dt;
+      ast.rotation += ast.vRot * dt;
+
+      if (ast.y > h + 100 || ast.x < -100 || ast.x > w + 100) {
+        this.asteroids.splice(i, 1);
+      }
+    }
+
     // Bomb shockwave expanding
     if (this.bombEffectTimer > 0) {
       this.bombEffectTimer -= dt;
@@ -389,6 +516,8 @@ export class SkyRaiderEngine {
       this.invulnerableTimer -= dt;
     }
 
+    const upg = upgradeManager.getCalculatedBonuses();
+
     // Boost meter recharge / depletion
     const boostPressed = this.heldKeys['ShiftLeft'] || this.heldKeys['ShiftRight'];
     if (boostPressed && this.boostGauge > 10) {
@@ -396,12 +525,13 @@ export class SkyRaiderEngine {
       this.boostGauge = Math.max(0, this.boostGauge - dt * 35);
     } else {
       this.isBoosting = false;
-      this.boostGauge = Math.min(100, this.boostGauge + dt * 18);
+      this.boostGauge = Math.min(100, this.boostGauge + dt * 18 * upg.boostRechargeMultiplier);
     }
 
     // Shield passive recharge if not damaged recently
-    if (this.playerShield < cfg.maxShield) {
-      this.playerShield = Math.min(cfg.maxShield, this.playerShield + dt * 4);
+    const maxShieldWithUpg = cfg.maxShield + this.bonusShieldCapacity + upg.shieldBonus;
+    if (this.playerShield < maxShieldWithUpg) {
+      this.playerShield = Math.min(maxShieldWithUpg, this.playerShield + dt * 4);
     }
 
     // Combo timer decay
@@ -435,7 +565,7 @@ export class SkyRaiderEngine {
     // Smooth banking tilt
     this.playerTiltX += (dx - this.playerTiltX) * dt * 12;
 
-    const currentSpeed = cfg.speed * (this.isBoosting ? 1.55 : 1.0);
+    const currentSpeed = cfg.speed * (1 + upg.speedPercentBonus) * (this.isBoosting ? 1.55 : 1.0);
     this.playerX += dx * currentSpeed * dt;
     this.playerY += dy * currentSpeed * dt;
 
@@ -457,6 +587,45 @@ export class SkyRaiderEngine {
       this.fireHomingMissiles();
     }
 
+    // Wingman update & targeting
+    if (this.wingmanActive) {
+      const targetWingX = this.playerX - 55;
+      const targetWingY = this.playerY + 22;
+      this.wingmanX += (targetWingX - this.wingmanX) * dt * 10;
+      this.wingmanY += (targetWingY - this.wingmanY) * dt * 10;
+
+      this.wingmanShootTimer -= dt;
+      if (this.wingmanShootTimer <= 0 && this.enemies.length > 0) {
+        this.wingmanShootTimer = 0.38;
+        const closest = [...this.enemies].sort((a, b) => {
+          return Math.hypot(a.x - this.wingmanX, a.y - this.wingmanY) - Math.hypot(b.x - this.wingmanX, b.y - this.wingmanY);
+        })[0];
+        if (closest) {
+          const angle = Math.atan2(closest.y - this.wingmanY, closest.x - this.wingmanX);
+          const vx = Math.cos(angle) * 780;
+          const vy = Math.sin(angle) * 780;
+          this.addBullet(this.wingmanX, this.wingmanY - 12, vx, vy, 3.5, 18, true, '#10b981', 'laser');
+        }
+      }
+
+      this.wingmanTimer -= dt;
+      if (this.wingmanTimer <= 0) {
+        this.wingmanActive = false;
+        this.wingmanCooldown = 35.0;
+        this.addCombatLog('Wingman Falcon-2 returning to carrier for rearming.', 'warning');
+      }
+    } else {
+      this.wingmanCooldown -= dt;
+      if (this.wingmanCooldown <= 0) {
+        this.wingmanActive = true;
+        this.wingmanHp = 100;
+        this.wingmanTimer = 50.0;
+        this.wingmanX = this.playerX - 55;
+        this.wingmanY = this.playerY + 22;
+        this.addCombatLog('WINGMAN SUPPORT: Falcon-2 escort fighter redeployed.', 'powerup');
+      }
+    }
+
     // Update Entities
     this.updateBullets(dt);
     this.updateMissiles(dt);
@@ -473,6 +642,37 @@ export class SkyRaiderEngine {
 
     // Notify HUD stats
     this.emitStats();
+
+    // Record combat replay frame
+    combatReplayBuffer.recordFrame({
+      playerX: this.playerX,
+      playerY: this.playerY,
+      playerTiltX: this.playerTiltX,
+      playerHp: this.playerHp,
+      maxHp: cfg.maxHp,
+      playerShield: this.playerShield,
+      maxShield: cfg.maxShield + this.bonusShieldCapacity,
+      planeId: this.planeId,
+      isBoosting: this.isBoosting,
+      score: this.score,
+      wave: this.wave,
+      enemies: this.enemies.map(e => ({
+        type: e.type,
+        x: e.x,
+        y: e.y,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        width: e.width,
+        height: e.height,
+      })),
+      bullets: this.bullets.map(b => ({
+        x: b.x,
+        y: b.y,
+        color: b.color,
+        isPlayer: b.isPlayer,
+        radius: b.radius,
+      })),
+    });
   }
 
   private firePlayerWeapon() {
@@ -523,6 +723,7 @@ export class SkyRaiderEngine {
   private fireHomingMissiles() {
     this.missileCooldownTimer = 1.2;
     soundSystem.playMissile();
+    soundSystem.playPilotChatter('target_locked');
 
     // Find closest enemies
     const sorted = [...this.enemies].sort((a, b) => {
@@ -559,13 +760,18 @@ export class SkyRaiderEngine {
     color: string,
     type: Bullet['type']
   ) {
+    let finalDamage = damage;
+    if (isPlayer) {
+      const upg = upgradeManager.getCalculatedBonuses();
+      finalDamage = Math.round(damage * (1 + upg.damageMultiplierBonus));
+    }
     this.bullets.push({
       x,
       y,
       vx,
       vy,
       radius,
-      damage,
+      damage: finalDamage,
       isPlayer,
       color,
       glowColor: color,
@@ -787,12 +993,12 @@ export class SkyRaiderEngine {
           x: startX + (i - 1) * 40,
           y: -40 - Math.abs(i - 1) * 30,
           vx: (Math.random() - 0.5) * 60,
-          vy: 160,
+          vy: 160 * this.difficultyMultiplier,
           hp: 35,
           maxHp: 35,
           width: 34,
           height: 32,
-          shootCooldown: 2.2,
+          shootCooldown: 2.2 / this.difficultyMultiplier,
           shootTimer: 0.8 + Math.random(),
           scoreValue: 150,
           hitFlashTimer: 0,
@@ -812,12 +1018,12 @@ export class SkyRaiderEngine {
           x: (i === 0 ? 0.3 : 0.7) * w,
           y: -50 - i * 40,
           vx: 0,
-          vy: 130,
+          vy: 130 * this.difficultyMultiplier,
           hp: 85,
           maxHp: 85,
           width: 48,
           height: 42,
-          shootCooldown: 2.0,
+          shootCooldown: 2.0 / this.difficultyMultiplier,
           shootTimer: 1.0,
           scoreValue: 350,
           hitFlashTimer: 0,
@@ -836,12 +1042,12 @@ export class SkyRaiderEngine {
         x: w * 0.5,
         y: -90,
         vx: 0,
-        vy: 80,
+        vy: 80 * this.difficultyMultiplier,
         hp: 220,
         maxHp: 220,
         width: 72,
         height: 64,
-        shootCooldown: 3.5,
+        shootCooldown: 3.5 / this.difficultyMultiplier,
         shootTimer: 2.0,
         scoreValue: 750,
         hitFlashTimer: 0,
@@ -857,6 +1063,8 @@ export class SkyRaiderEngine {
   private spawnBoss() {
     this.isBossActive = true;
     soundSystem.playBossWarning();
+    soundSystem.playPilotChatter('flagship_detected');
+    this.addCombatLog('WARNING: Hostile Capital Dreadnought incoming!', 'boss');
 
     this.createFloatingText(
       this.canvas.width / 2,
@@ -874,12 +1082,12 @@ export class SkyRaiderEngine {
       x: this.canvas.width / 2,
       y: -120,
       vx: 0,
-      vy: 40,
+      vy: 40 * this.difficultyMultiplier,
       hp: bossHp,
       maxHp: bossHp,
       width: 130,
       height: 90,
-      shootCooldown: 1.6,
+      shootCooldown: 1.6 / this.difficultyMultiplier,
       shootTimer: 2.0,
       scoreValue: 5000,
       hitFlashTimer: 0,
@@ -897,6 +1105,8 @@ export class SkyRaiderEngine {
     this.waveEnemiesSpawned = 0;
     this.waveEnemiesTotal = 12 + this.wave * 3;
     this.callbacks.onSectorCleared(this.wave);
+    soundSystem.playPilotChatter('sector_cleared');
+    this.addCombatLog(`Sector ${this.wave} reached. Airspace sector secure.`, 'warning');
 
     this.createFloatingText(
       this.canvas.width / 2,
@@ -942,7 +1152,41 @@ export class SkyRaiderEngine {
       }
     }
 
-    // 2. Missiles vs Enemies
+    // Player Bullets vs Asteroids
+    for (let bIdx = this.bullets.length - 1; bIdx >= 0; bIdx--) {
+      const b = this.bullets[bIdx];
+      if (!b.isPlayer) continue;
+
+      for (let aIdx = this.asteroids.length - 1; aIdx >= 0; aIdx--) {
+        const ast = this.asteroids[aIdx];
+        if (Math.hypot(b.x - ast.x, b.y - ast.y) < ast.radius + b.radius) {
+          ast.hp -= b.damage;
+          this.createSpark(b.x, b.y, b.color);
+          this.bullets.splice(bIdx, 1);
+          if (ast.hp <= 0) {
+            this.createExplosion(ast.x, ast.y, 'medium', '#f97316');
+            this.score += 200;
+            this.asteroids.splice(aIdx, 1);
+            this.addCombatLog('Asteroid hazard pulverized.', 'kill');
+          }
+          break;
+        }
+      }
+    }
+
+    // Player vs Asteroids
+    if (this.isRunning && this.playerHp > 0 && this.invulnerableTimer <= 0) {
+      for (let aIdx = this.asteroids.length - 1; aIdx >= 0; aIdx--) {
+        const ast = this.asteroids[aIdx];
+        if (Math.hypot(this.playerX - ast.x, this.playerY - ast.y) < ast.radius + 18) {
+          this.damagePlayer(25);
+          this.createExplosion(ast.x, ast.y, 'medium', '#ef4444');
+          this.asteroids.splice(aIdx, 1);
+          this.addCombatLog('Collision with asteroid hazard!', 'warning');
+          break;
+        }
+      }
+    }
     for (let mIdx = this.missiles.length - 1; mIdx >= 0; mIdx--) {
       const m = this.missiles[mIdx];
       for (let eIdx = this.enemies.length - 1; eIdx >= 0; eIdx--) {
@@ -955,6 +1199,27 @@ export class SkyRaiderEngine {
 
           if (e.hp <= 0) {
             this.destroyEnemy(e, eIdx);
+          }
+          break;
+        }
+      }
+    }
+
+    // Enemy Bullets vs Wingman
+    if (this.wingmanActive) {
+      for (let bIdx = this.bullets.length - 1; bIdx >= 0; bIdx--) {
+        const b = this.bullets[bIdx];
+        if (b.isPlayer) continue;
+        if (Math.hypot(b.x - this.wingmanX, b.y - this.wingmanY) < b.radius + 16) {
+          this.wingmanHp -= b.damage;
+          this.bullets.splice(bIdx, 1);
+          this.createSpark(this.wingmanX, this.wingmanY, '#10b981');
+          if (this.wingmanHp <= 0) {
+            this.wingmanActive = false;
+            this.wingmanCooldown = 45.0;
+            this.createExplosion(this.wingmanX, this.wingmanY, 'small', '#10b981');
+            soundSystem.playPilotChatter('wingman_down');
+            this.addCombatLog('WINGMAN DOWN: Falcon-2 shot down and forced to eject!', 'warning');
           }
           break;
         }
@@ -1013,16 +1278,21 @@ export class SkyRaiderEngine {
       this.bossesDefeated++;
       this.isBossActive = false;
       this.bossInstance = null;
+      this.addCombatLog('Capital Dreadnought neutralized! +5000 PTS', 'boss');
       this.createFloatingText(e.x, e.y, 'BOSS ANNIHILATED +5000', '#fbbf24', 24);
 
       newlyCompleted.push(...missionManager.reportProgress('kill_bosses', 1, 'add'));
       this.advanceWave();
-    } else if (e.type === 'cruiser' || e.type === 'bomber') {
+    } else if (e.type === 'cruiser' || e.type === 'bomber' || e.type === 'gunship' || e.type === 'scout') {
+      this.eliteEnemiesKilled++;
       this.hitstopTimer = 0.04;
       this.trauma = 0.4;
       soundSystem.playExplosion('medium');
+      this.addCombatLog(`Hostile ${e.type} destroyed.`, 'kill');
     } else {
+      this.regularEnemiesKilled++;
       soundSystem.playExplosion('small');
+      this.addCombatLog(`Hostile ${e.type} downed.`, 'kill');
     }
 
     // Explosion particles
@@ -1085,6 +1355,7 @@ export class SkyRaiderEngine {
     soundSystem.playPowerup();
     this.powerupsCollected++;
     const cfg = PLANE_CONFIGS[this.planeId];
+    this.addCombatLog(`Power-up acquired: ${p.type.toUpperCase()}`, 'powerup');
 
     const completed = missionManager.reportProgress('collect_powerups', 1, 'add');
     if (completed.length > 0) {
@@ -1113,6 +1384,7 @@ export class SkyRaiderEngine {
   private damagePlayer(amount: number) {
     soundSystem.playShieldHit();
     this.trauma = Math.min(1.0, this.trauma + 0.35);
+    this.addCombatLog(`Warning: Armor sustaining enemy fire!`, 'warning');
 
     if (this.playerShield > 0) {
       this.playerShield -= amount;
@@ -1122,6 +1394,10 @@ export class SkyRaiderEngine {
       }
     } else {
       this.playerHp -= amount;
+    }
+
+    if (this.playerShield < 25 || this.playerHp < 35) {
+      soundSystem.playPilotChatter('shields_failing');
     }
 
     this.createExplosion(this.playerX, this.playerY, 'small', '#38bdf8');
@@ -1137,6 +1413,7 @@ export class SkyRaiderEngine {
 
   private onPlayerDeath() {
     this.isRunning = false;
+    combatReplayBuffer.stopRecording();
     soundSystem.playExplosion('boss');
     this.createExplosion(this.playerX, this.playerY, 'boss', '#ef4444');
 
@@ -1266,6 +1543,8 @@ export class SkyRaiderEngine {
       boostGauge: this.boostGauge,
       isBoosting: this.isBoosting,
       enemiesKilled: this.enemiesKilled,
+      regularEnemiesKilled: this.regularEnemiesKilled,
+      eliteEnemiesKilled: this.eliteEnemiesKilled,
       bossesDefeated: this.bossesDefeated,
       shotsFired: this.shotsFired,
       shotsHit: this.shotsHit,
@@ -1278,6 +1557,15 @@ export class SkyRaiderEngine {
       bossMaxHp: this.bossInstance ? this.bossInstance.maxHp : null,
       bossName: this.bossInstance ? (this.bossInstance.name || 'CRIMSON TITAN') : null,
       activeMissions: missionManager.getMissions(),
+      combatLogs: this.combatLogs,
+      aceRating: pilotManager.getAceRating().rating,
+      aceTitle: pilotManager.getAceRating().title,
+      activeWeather: this.activeWeather,
+      weatherTimer: this.weatherTimer,
+      wingmanActive: this.wingmanActive,
+      wingmanHp: this.wingmanHp,
+      wingmanMaxHp: this.wingmanMaxHp,
+      wingmanTimer: this.wingmanActive ? this.wingmanTimer : this.wingmanCooldown,
     };
   }
 
@@ -1333,12 +1621,43 @@ export class SkyRaiderEngine {
     // 2. Powerups
     this.renderPowerups(ctx);
 
+    // Render Asteroid Hazards
+    this.asteroids.forEach(ast => {
+      ctx.save();
+      ctx.translate(ast.x, ast.y);
+      ctx.rotate(ast.rotation);
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.arc(-ast.radius * 0.3, -ast.radius * 0.2, ast.radius * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
+    // Thunderstorm lightning flash overlay
+    if (this.activeWeather === 'thunderstorm' && this.lightningFlashTimer < 0.25) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.fillRect(0, 0, w, h);
+    }
+
     // 3. Enemies & Telegraph Beams
     this.renderEnemies(ctx);
 
     // 4. Bullets & Missiles
     this.renderBullets(ctx);
     this.renderMissiles(ctx);
+
+    // Render Wingman Escort
+    if (this.wingmanActive) {
+      drawWingman(ctx, this.wingmanX, this.wingmanY);
+    }
 
     // 5. Player Aircraft
     if (this.isRunning && this.playerHp > 0) {

@@ -311,3 +311,38 @@ function drawThrusterFlame(
   ctx.fill();
   ctx.restore();
 }
+
+export function drawWingman(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(16, 185, 129, 0.6)';
+
+  // Thruster
+  drawThrusterFlame(ctx, 0, 16, 10, 3, '#10b981', '#a7f3d0');
+
+  // Wingman body (compact escort drone jet)
+  ctx.fillStyle = '#0f172a';
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(0, -18);
+  ctx.lineTo(6, -4);
+  ctx.lineTo(18, 6);
+  ctx.lineTo(12, 14);
+  ctx.lineTo(0, 10);
+  ctx.lineTo(-12, 14);
+  ctx.lineTo(-18, 6);
+  ctx.lineTo(-6, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Cockpit
+  ctx.fillStyle = '#34d399';
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 1.5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}

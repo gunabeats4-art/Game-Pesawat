@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { DailyMission, PlaneId } from '../game/types';
 import { PLANE_CONFIGS } from '../game/planes';
-import { Volume2, VolumeX, Shield, Zap, Flame, Crosshair, Target, User, Trophy } from 'lucide-react';
+import { Volume2, VolumeX, Shield, Zap, Flame, Crosshair, Target, User, Trophy, Wrench } from 'lucide-react';
 import { PilotProfile, PILOT_AVATARS, getRankInfo } from '../game/pilot';
 
 interface TitleScreenProps {
@@ -16,6 +16,7 @@ interface TitleScreenProps {
   pilotProfile: PilotProfile;
   onOpenProfile: () => void;
   onOpenLeaderboard: () => void;
+  onOpenHangar?: () => void;
 }
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({
@@ -30,6 +31,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   pilotProfile,
   onOpenProfile,
   onOpenLeaderboard,
+  onOpenHangar,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -48,13 +50,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         onOpenProfile();
       } else if (e.code === 'KeyL') {
         onOpenLeaderboard();
+      } else if (e.code === 'KeyH' && onOpenHangar) {
+        onOpenHangar();
       } else if (e.code === 'KeyM') {
         onToggleMute();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onStartGame, onSelectPlane, onToggleMute, onOpenMissions, onOpenProfile, onOpenLeaderboard]);
+  }, [onStartGame, onSelectPlane, onToggleMute, onOpenMissions, onOpenProfile, onOpenLeaderboard, onOpenHangar]);
 
   const activePlane = PLANE_CONFIGS[selectedPlane];
   const completedMissionsCount = activeMissions.filter(m => m.completed).length;
@@ -92,14 +96,26 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </button>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Hangar & Upgrades Trigger Button */}
+          {onOpenHangar && (
+            <button
+              onClick={onOpenHangar}
+              title="Open Tactical Hangar & Upgrades [H]"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono transition-all cursor-pointer shadow-[0_0_10px_rgba(56,189,248,0.15)]"
+            >
+              <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline font-semibold">HANGAR</span>
+            </button>
+          )}
+
           {/* Global Leaderboard Trigger Button */}
           <button
             onClick={onOpenLeaderboard}
-            title="View Global Community Rankings [L]"
+            title="Lihat Peringkat Komunitas Global [L]"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/40 text-amber-300 text-xs font-mono transition-all cursor-pointer shadow-sm"
           >
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline font-semibold">RANKINGS</span>
+            <span className="hidden sm:inline font-semibold">PERINGKAT</span>
           </button>
 
           {/* Daily Missions Trigger Button */}
@@ -108,20 +124,20 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-mono transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.15)]"
           >
             <Target className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline font-semibold">DIRECTIVES</span>
+            <span className="hidden sm:inline font-semibold">INSTRUKSI</span>
             <span className="tabular-nums font-bold text-amber-400">
               [{completedMissionsCount}/{activeMissions.length}]
             </span>
           </button>
 
           <div className="flex items-center gap-2 text-xs font-mono tabular-nums text-slate-300">
-            <span className="text-slate-400">RECORD:</span>
+            <span className="text-slate-400">REKOR:</span>
             <span className="text-amber-400 font-semibold text-sm">{highScore.toLocaleString()}</span>
           </div>
 
           <button
             onClick={onToggleMute}
-            aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            aria-label={isMuted ? 'Aktifkan Suara' : 'Matikan Suara'}
             className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer"
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
@@ -172,17 +188,17 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           SKY RAIDER
         </h1>
         <p className="font-display tracking-[0.35em] text-sm sm:text-base font-semibold text-red-400 mt-1 uppercase">
-          ELANG TEMPUR · AIR SUPREMACY
+          ELANG TEMPUR · PERTEMPURAN UDARA NUSANTARA
         </p>
 
         <p className="text-slate-400 text-xs sm:text-sm mt-3 max-w-lg mx-auto">
-          Scramble your fighter, evade enemy bullet formations, unleash tactical bombs, and neutralize capital dreadnoughts.
+          Luncurkan pesawat tempurmu, hindari formasi peluru musuh, lepaskan bom taktis, dan hancurkan kapal induk dreadnought.
         </p>
 
         {/* Aircraft Hangar Selection */}
         <div className="w-full mt-7 mb-7">
           <div className="text-left text-xs font-mono uppercase tracking-wider text-slate-400 mb-2.5 flex items-center justify-between">
-            <span>SELECT FIGHTER JET:</span>
+            <span>PILIH PESAWAT TEMPUR:</span>
             <span className="text-cyan-400 font-semibold">{activePlane.codename}</span>
           </div>
 
@@ -223,7 +239,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                   <div className="space-y-1.5 text-[10px] font-mono text-slate-400">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Flame className="w-3 h-3 text-amber-400" /> SPEED
+                        <Flame className="w-3 h-3 text-amber-400" /> KECEPATAN
                       </span>
                       <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden">
                         <div
@@ -235,7 +251,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Crosshair className="w-3 h-3 text-red-400" /> FIREPOWER
+                        <Crosshair className="w-3 h-3 text-red-400" /> DAYA TEMBAK
                       </span>
                       <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden">
                         <div
@@ -247,7 +263,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Shield className="w-3 h-3 text-emerald-400" /> ARMOR
+                        <Shield className="w-3 h-3 text-emerald-400" /> PELINDUNG
                       </span>
                       <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden">
                         <div
@@ -270,7 +286,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         >
           <span className="flex items-center gap-2">
             <Zap className="w-5 h-5 fill-current" />
-            LAUNCH SORTIE
+            LUNCURKAN MISI
             <span className="text-xs font-mono font-normal opacity-80 ml-2 py-0.5 px-2 bg-slate-950/20 rounded">
               ENTER / SPACE
             </span>
@@ -281,10 +297,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       {/* Single Flat Control-Hint Line */}
       <div className="w-full max-w-4xl mx-auto pt-4 border-t border-slate-800/80 text-center">
         <p className="text-xs font-mono text-slate-400 tracking-wide">
-          <span className="text-cyan-400">WASD / Drag</span> Move · <span className="text-cyan-400">Space</span> Shoot ·{' '}
-          <span className="text-amber-400">B</span> Bomb · <span className="text-emerald-400">Shift</span> Boost ·{' '}
-          <span className="text-sky-300">P</span> Pilot · <span className="text-amber-300">L</span> Rankings · <span className="text-cyan-300">D</span> Directives ·{' '}
-          <span className="text-slate-300">Esc</span> Pause
+          <span className="text-cyan-400">WASD / Geser</span> Gerak · <span className="text-cyan-400">Space</span> Tembak ·{' '}
+          <span className="text-amber-400">B</span> Bom · <span className="text-emerald-400">Shift</span> Boost ·{' '}
+          <span className="text-sky-300">P</span> Profil · <span className="text-amber-300">L</span> Peringkat · <span className="text-cyan-300">D</span> Instruksi ·{' '}
+          <span className="text-cyan-300">H</span> Hangar · <span className="text-slate-300">Esc</span> Jeda
         </p>
       </div>
     </div>

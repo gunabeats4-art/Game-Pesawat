@@ -330,6 +330,93 @@ class SoundSystem {
       osc.stop(noteTime + 0.35);
     });
   }
+
+  private lastChatterTime: number = 0;
+
+  public playRadioBeep() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1200, t);
+    osc.frequency.setValueAtTime(800, t + 0.05);
+
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  public playPilotChatter(cue: PilotChatterCue) {
+    if (this.isMuted) return;
+    const now = Date.now();
+    if (now - this.lastChatterTime < 3000 && cue !== 'promotion' && cue !== 'flagship_detected') {
+      return;
+    }
+    this.lastChatterTime = now;
+
+    this.playRadioBeep();
+
+    let text = '';
+    switch (cue) {
+      case 'bogey_six':
+        text = 'Musuh di belakang jam enam!';
+        break;
+      case 'shields_failing':
+        text = 'Perisai kritis! Menerima kerusakan parah!';
+        break;
+      case 'target_locked':
+        text = 'Musuh terkunci!';
+        break;
+      case 'bomb_authorized':
+        text = 'Bom Overdrive diizinkan!';
+        break;
+      case 'flagship_detected':
+        text = 'Peringatan! Kapal induk musuh terdeteksi!';
+        break;
+      case 'wingman_down':
+        text = 'Pesawat sayap menerima tembakan berat!';
+        break;
+      case 'sector_cleared':
+        text = 'Sektor aman! Menuju wilayah udara berikutnya!';
+        break;
+      case 'promotion':
+        text = 'Kenaikan pangkat diberikan! Selamat, Pilot!';
+        break;
+    }
+
+    if (text && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'id-ID';
+        utterance.pitch = 1.1;
+        utterance.rate = 1.15;
+        utterance.volume = 0.85;
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        // Ignore synthesis error
+      }
+    }
+  }
 }
+
+export type PilotChatterCue =
+  | 'bogey_six'
+  | 'shields_failing'
+  | 'target_locked'
+  | 'bomb_authorized'
+  | 'flagship_detected'
+  | 'wingman_down'
+  | 'sector_cleared'
+  | 'promotion';
 
 export const soundSystem = new SoundSystem();

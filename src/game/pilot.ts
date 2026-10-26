@@ -299,6 +299,31 @@ export class PilotManager {
       unlockedAchievements: evalResult.newlyUnlocked,
     };
   }
+
+  public getAceRating(): { rating: number; title: string } {
+    return calculateAceRating(this.profile);
+  }
+}
+
+export function calculateAceRating(profile: PilotProfile): { rating: number; title: string } {
+  const missions = Math.max(1, profile.missionsFlown);
+  const accuracy = profile.totalShotsFired > 0 ? profile.totalShotsHit / profile.totalShotsFired : 0;
+  const killEfficiency = Math.min(1.0, profile.enemiesDefeated / (missions * 25));
+  const accuracyScore = Math.min(1.0, accuracy * 2.5);
+  const bossBonus = Math.min(1.0, profile.bossesDefeated / (missions * 0.4));
+
+  const rawRating = Math.round(killEfficiency * 40 + accuracyScore * 40 + bossBonus * 20);
+  const rating = Math.max(15, Math.min(100, rawRating));
+
+  let title = 'Rookie';
+  if (rating >= 90) title = 'Grand Ace Supreme';
+  else if (rating >= 75) title = 'Elite Ace';
+  else if (rating >= 60) title = 'Squadron Leader';
+  else if (rating >= 40) title = 'Seasoned Pilot';
+  else if (rating >= 25) title = 'Wingman';
+
+  return { rating, title };
 }
 
 export const pilotManager = new PilotManager();
+
